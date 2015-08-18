@@ -29,8 +29,9 @@
 # protocol.  Jsvc is not required if SASL is configured for authentication of
 # data transfer protocol using non-privileged ports.
 #export JSVC_HOME=${JSVC_HOME}
-export HADOOP_PREFIX=/hadoop-dist/hadoop-2.6.0
+export HADOOP_PREFIX=/usr/local/hadoop
 export HADOOP_CONF_DIR=${HADOOP_CONF_DIR:-"/etc/hadoop"}
+export JAVA_HOME=/usr/lib/jvm/java-7-openjdk-amd64
 
 # Extra Java CLASSPATH elements.  Automatically insert capacity-scheduler.
 for f in $HADOOP_HOME/contrib/capacity-scheduler/*.jar; do

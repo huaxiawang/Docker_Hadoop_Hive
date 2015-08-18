@@ -1,29 +1,52 @@
+FROM debian:jessie
 FROM java:7
 MAINTAINER hwang <hwang@transcendinsight.com>
 
+USER root
+
+RUN apt-get update && apt-get install -y openssh-server openssh-client rsync --no-install-recommends && rm -rf /var/lib/apt/lists/*
+
+# Hadoop
 RUN wget http://mirror.tcpdiag.net/apache/hadoop/common/hadoop-2.6.0/hadoop-2.6.0.tar.gz
-RUN mkdir /hadoop-dist
-RUN mv hadoop-2.6.0.tar.gz /hadoop-dist
-RUN cd /hadoop-dist/ && tar zxf hadoop-2.6.0.tar.gz && rm hadoop-2.6.0.tar.gz
+RUN mv hadoop-2.6.0.tar.gz /usr/local/
+RUN cd /usr/local && tar -zxf hadoop-2.6.0.tar.gz && ln -s ./hadoop-2.6.0 hadoop && rm hadoop-2.6.0.tar.gz
 
-RUN ssh-keygen -t dsa -P '' -f ~/.ssh/id_dsa
-RUN cat ~/.ssh/id_dsa.pub >> ~/.ssh/authorized_keys
-RUN ssh-keyscan -H localhost >> /root/.ssh/known_hosts
-RUN ssh-keyscan -H 127.0.0.1 >> ~/.ssh/known_hosts
-RUN ssh-keyscan -H 0.0.0.0 >> ~/.ssh/known_hosts
+# passwordless ssh
+# RUN ssh-keygen -q -N "" -t dsa -f /etc/ssh/ssh_host_dsa_key
+# RUN ssh-keygen -q -N "" -t rsa -f /etc/ssh/ssh_host_rsa_key
+RUN ssh-keygen -q -N "" -t rsa -f /root/.ssh/id_rsa
+RUN cp /root/.ssh/id_rsa.pub /root/.ssh/authorized_keys
 
-ENV JAVA_HOME=/usr/lib/jvm/java-7-openjdk-amd64
-ENV HADOOP_HOME=/hadoop-dist/hadoop-2.6.0
-ENV HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop
+# Java
+RUN ls -R /usr/lib/jvm
+ENV JAVA_HOME /usr/lib/jvm/java-7-openjdk-amd64
+
+ENV HADOOP_PREFIX /usr/local/hadoop
+ENV HADOOP_COMMON_HOME /usr/local/hadoop
+ENV HADOOP_HDFS_HOME /usr/local/hadoop
+ENV HADOOP_MAPRED_HOME /usr/local/hadoop
+ENV HADOOP_YARN_HOME /usr/local/hadoop
+ENV HADOOP_CONF_DIR /usr/local/hadoop/etc/hadoop
+ENV YARN_CONF_DIR $HADOOP_PREFIX/etc/hadoop
 
 ADD *.xml $HADOOP_CONF_DIR/
+ADD core-site.xml.template $HADOOP_CONF_DIR/
 ADD slaves $HADOOP_CONF_DIR/
 ADD hadoop-env.sh $HADOOP_CONF_DIR/
-ADD boot-hadoop.sh /
-RUN chmod 777 /boot-hadoop.sh
+RUN chmod +x $HADOOP_CONF_DIR//*-env.sh
 RUN mkdir /var/tmp/hadoop && mkdir /var/tmp/pid
 
 VOLUME ["/var/tmp/hadoop", "/var/tmp/pid"]
+
+RUN $HADOOP_PREFIX/bin/hdfs namenode -format
+
+ADD ssh_config /root/.ssh/config
+RUN chown root:root /root/.ssh/config
+RUN chmod 600 /root/.ssh/config
+
+RUN sed  -i "/^[^#]*UsePAM/ s/.*/#&/"  /etc/ssh/sshd_config
+RUN echo "UsePAM no" >> /etc/ssh/sshd_config
+RUN echo "Port 2122" >> /etc/ssh/sshd_config
 
 # SSH
 EXPOSE 22
@@ -71,4 +94,8 @@ EXPOSE 8042
 # yarn.resourcemanager.webapp.address
 EXPOSE 8088
 
-CMD /boot-hadoop.sh
+ADD boot-hadoop.sh /
+RUN chown root:root /boot-hadoop.sh
+RUN chmod 700 /boot-hadoop.sh
+
+CMD ["/boot-hadoop.sh", "-d"]
