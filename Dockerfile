@@ -18,7 +18,6 @@ RUN ssh-keygen -q -N "" -t rsa -f /root/.ssh/id_rsa
 RUN cp /root/.ssh/id_rsa.pub /root/.ssh/authorized_keys
 
 # Java
-RUN ls -R /usr/lib/jvm
 ENV JAVA_HOME /usr/lib/jvm/java-7-openjdk-amd64
 
 ENV HADOOP_PREFIX /usr/local/hadoop
@@ -31,12 +30,11 @@ ENV YARN_CONF_DIR $HADOOP_PREFIX/etc/hadoop
 
 ADD *.xml $HADOOP_CONF_DIR/
 ADD core-site.xml.template $HADOOP_CONF_DIR/
+RUN sed s/HOSTNAME/localhost/ /usr/local/hadoop/etc/hadoop/core-site.xml.template > /usr/local/hadoop/etc/hadoop/core-site.xml
 ADD slaves $HADOOP_CONF_DIR/
 ADD hadoop-env.sh $HADOOP_CONF_DIR/
-RUN chmod +x $HADOOP_CONF_DIR//*-env.sh
-RUN mkdir /var/tmp/hadoop && mkdir /var/tmp/pid
-
-VOLUME ["/var/tmp/hadoop", "/var/tmp/pid"]
+RUN chmod +x $HADOOP_CONF_DIR/*-env.sh
+RUN mkdir /var/hadoop && mkdir /var/tmp/pid
 
 RUN $HADOOP_PREFIX/bin/hdfs namenode -format
 
@@ -48,11 +46,12 @@ RUN sed  -i "/^[^#]*UsePAM/ s/.*/#&/"  /etc/ssh/sshd_config
 RUN echo "UsePAM no" >> /etc/ssh/sshd_config
 RUN echo "Port 2122" >> /etc/ssh/sshd_config
 
+RUN service ssh start && $HADOOP_PREFIX/etc/hadoop/hadoop-env.sh && $HADOOP_PREFIX/sbin/start-dfs.sh && $HADOOP_PREFIX/bin/hdfs dfs -mkdir -p /user/root/log && $HADOOP_PREFIX/bin/hdfs dfs -mkdir /tmp && $HADOOP_PREFIX/bin/hdfs dfs -mkdir -p /user/hive/warehouse && $HADOOP_PREFIX/bin/hdfs dfs -chmod g+w /tmp && $HADOOP_PREFIX/bin/hdfs dfs -chmod g+w /user/hive/warehouse
+
 # SSH
 EXPOSE 22
 
 # HDFS
-
 # dfs.http.address
 EXPOSE 50070
 
@@ -72,7 +71,6 @@ EXPOSE 50020
 EXPOSE 50090
 
 #YARN
-
 # yarn.resourcemanager.scheduler.address
 EXPOSE 8030
 
