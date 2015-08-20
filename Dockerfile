@@ -11,6 +11,11 @@ RUN wget http://mirror.tcpdiag.net/apache/hadoop/common/hadoop-2.6.0/hadoop-2.6.
 RUN mv hadoop-2.6.0.tar.gz /usr/local/
 RUN cd /usr/local && tar -zxf hadoop-2.6.0.tar.gz && ln -s ./hadoop-2.6.0 hadoop && rm hadoop-2.6.0.tar.gz
 
+# Hive
+RUN wget https://archive.apache.org/dist/hive/hive-0.13.1/apache-hive-0.13.1-bin.tar.gz
+RUN mv apache-hive-0.13.1-bin.tar.gz /usr/local
+RUN cd /usr/local && tar -xzf apache-hive-0.13.1-bin.tar.gz && ln -s ./apache-hive-0.13.1-bin hive && rm apache-hive-0.13.1-bin.tar.gz
+
 # passwordless ssh
 # RUN ssh-keygen -q -N "" -t dsa -f /etc/ssh/ssh_host_dsa_key
 # RUN ssh-keygen -q -N "" -t rsa -f /etc/ssh/ssh_host_rsa_key
@@ -28,13 +33,26 @@ ENV HADOOP_YARN_HOME /usr/local/hadoop
 ENV HADOOP_CONF_DIR /usr/local/hadoop/etc/hadoop
 ENV YARN_CONF_DIR $HADOOP_PREFIX/etc/hadoop
 
-ADD *.xml $HADOOP_CONF_DIR/
+ENV HIVE_HOME=/usr/local/hive
+ENV HIVE_CONF_DIR=$HIVE_HOME/conf
+
 ADD core-site.xml.template $HADOOP_CONF_DIR/
 RUN sed s/HOSTNAME/localhost/ /usr/local/hadoop/etc/hadoop/core-site.xml.template > /usr/local/hadoop/etc/hadoop/core-site.xml
+ADD hdfs-site.xml $HADOOP_CONF_DIR/
+ADD mapred-site.xml $HADOOP_CONF_DIR/
+ADD yarn-site.xml $HADOOP_CONF_DIR/
 ADD slaves $HADOOP_CONF_DIR/
 ADD hadoop-env.sh $HADOOP_CONF_DIR/
+RUN chmod 700 $HADOOP_CONF_DIR/hadoop-env.sh
 RUN chmod +x $HADOOP_CONF_DIR/*-env.sh
 RUN mkdir /var/hadoop && mkdir /var/tmp/pid
+
+ADD mysql-connector-java.jar $HIVE_HOME/lib/
+ADD hive-default.xml $HIVE_CONF_DIR/
+ADD hive-site.xml $HIVE_CONF_DIR/
+ADD hive-env.sh $HIVE_CONF_DIR/
+
+ENV CLASSPATH=$CLASSPATH:$HIVE_HOME/lib/mysql-connector-java.jar
 
 RUN $HADOOP_PREFIX/bin/hdfs namenode -format
 
@@ -92,8 +110,11 @@ EXPOSE 8042
 # yarn.resourcemanager.webapp.address
 EXPOSE 8088
 
-ADD boot-hadoop.sh /
-RUN chown root:root /boot-hadoop.sh
-RUN chmod 700 /boot-hadoop.sh
+#HIVE
+EXPOSE 10000 9083
 
-CMD ["/boot-hadoop.sh", "-d"]
+ADD boot-hadoop-hive.sh /
+RUN chown root:root /boot-hadoop-hive.sh
+RUN chmod 700 /boot-hadoop-hive.sh
+
+CMD ["/boot-hadoop-hive.sh", "-d"]
